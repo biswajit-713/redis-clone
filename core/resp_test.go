@@ -87,3 +87,24 @@ func TestArray(t *testing.T) {
 	}
 
 }
+
+func TestDecodeArrayString(t *testing.T) {
+	cases := map[string][]interface{}{
+		"*2\r\n$5\r\nhello\r\n$5\r\nworld\r\n": {"hello", "world"},
+	}
+
+	for command, want := range cases {
+		array, _ := core.DecodeArrayString([]byte(command))
+
+		if len(array) != len(want) {
+			t.Errorf("The result count is incorrect. got %d, want %d", len(array), len(want))
+		}
+
+		for i := range array {
+			if want[i] != array[i] {
+				t.Errorf("value didn't match, got %s, want %s", array[i], want[i])
+			}
+		}
+
+	}
+}
