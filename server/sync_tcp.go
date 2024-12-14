@@ -25,7 +25,8 @@ func RunSyncTCPServer(host string, port int) {
 	for {
 		c, err := lsnr.Accept()
 		if err != nil {
-			panic(err)
+			log.Println("error accepting connection", err)
+			return
 		}
 
 		cons_client += 1
@@ -47,7 +48,7 @@ func RunSyncTCPServer(host string, port int) {
 	}
 }
 
-func readCommand(c net.Conn) (*core.RedisCmd, error) {
+func readCommand(c io.ReadWriter) (*core.RedisCmd, error) {
 
 	buf := make([]byte, 512)
 	n, err := c.Read(buf[:])
@@ -68,13 +69,13 @@ func readCommand(c net.Conn) (*core.RedisCmd, error) {
 
 }
 
-func respond(c net.Conn, cmd *core.RedisCmd) {
+func respond(c io.ReadWriter, cmd *core.RedisCmd) {
 	err := core.EvalAndRespond(cmd, c)
 	if err != nil {
 		respondError(err, c)
 	}
 }
 
-func respondError(err error, c net.Conn) {
+func respondError(err error, c io.ReadWriter) {
 	c.Write([]byte(fmt.Sprintf("-%s\r\n", err)))
 }
