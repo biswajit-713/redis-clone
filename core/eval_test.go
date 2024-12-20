@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/diceclone/core"
 )
@@ -16,6 +17,14 @@ type MockReadWriter struct {
 	LastWrite   []byte
 }
 
+type MockTimeProvider struct {
+	MockTime time.Time
+}
+
+func (m MockTimeProvider) Now() time.Time {
+	return time.Date(2023, time.January, 1, 0, 0, 0, 0, time.UTC)
+}
+
 func (m *MockReadWriter) Read(b []byte) (n int, e error) {
 	return m.ReadBuffer.Read(b)
 }
@@ -23,6 +32,20 @@ func (m *MockReadWriter) Read(b []byte) (n int, e error) {
 func (m *MockReadWriter) Write(b []byte) (n int, e error) {
 	m.LastWrite = append([]byte(nil), b...)
 	return m.WriteBuffer.Write(b)
+}
+
+func setupTest() (*MockReadWriter, MockTimeProvider) {
+	mockReadWriter := &MockReadWriter{
+		ReadBuffer:  bytes.NewBufferString(""),
+		WriteBuffer: bytes.NewBufferString(""),
+	}
+
+	mockTime := time.Date(2023, time.January, 1, 0, 0, 0, 0, time.UTC)
+	timeProvider := MockTimeProvider{
+		MockTime: mockTime,
+	}
+
+	return mockReadWriter, timeProvider
 }
 
 func TestPINGCommand(t *testing.T) {
@@ -49,15 +72,13 @@ func TestPINGCommand(t *testing.T) {
 		},
 	}
 
-	mockReadWriter := &MockReadWriter{
-		ReadBuffer:  bytes.NewBufferString(""),
-		WriteBuffer: bytes.NewBufferString(""),
-	}
+	mockReadWriter, timeProvider := setupTest()
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := core.EvalAndRespond(
 				&core.RedisCmd{Cmd: tc.command, Args: tc.argument},
 				mockReadWriter,
+				timeProvider,
 			)
 			if got != tc.want {
 				t.Errorf("got %v, want %v", got, tc.want)
@@ -94,14 +115,11 @@ func TestSETCommand(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		mockReadWriter := &MockReadWriter{
-			ReadBuffer:  bytes.NewBufferString(""),
-			WriteBuffer: bytes.NewBufferString(""),
-		}
+		mockReadWriter, timeProvider := setupTest()
 		t.Run(tc.name, func(t *testing.T) {
 			got := core.EvalAndRespond(&core.RedisCmd{
 				Cmd: tc.command, Args: tc.argument,
-			}, mockReadWriter)
+			}, mockReadWriter, timeProvider)
 
 			if !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("got %v, want %v", reflect.TypeOf(got), reflect.TypeOf(tc.want))
@@ -112,4 +130,57 @@ func TestSETCommand(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGETCommand(t *testing.T) {
+	cases := []struct {
+		name     string
+		command  string
+		argument string
+		want     []byte
+	}{
+		{
+			name:     "GET value of a key when it is not expired",
+			command:  "GET",
+			argument: "key",
+			want:     []byte("$5\r\nvalue\r\n"),
+		},
+		{
+			name:     "GET value of a key that does not exist",
+			command:  "GET",
+			argument: "nonexistent",
+			want:     []byte("$-1\r\n"),
+		},
+	}
+
+	mockReadWriter, timeProvider := setupTest()
+	core.EvalAndRespond(&core.RedisCmd{Cmd: "SET", Args: []string{"key", "value"}}, mockReadWriter, timeProvider)
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := core.EvalAndRespond(&core.RedisCmd{
+				Cmd:  tc.command,
+				Args: []string{tc.argument},
+			}, mockReadWriter, timeProvider)
+
+			if !bytes.Equal(mockReadWriter.LastWrite, tc.want) {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestGETCommandWithValueExpired(t *testing.T) {
+
+	mockReadWriter, timeProvider := setupTest()
+	core.EvalAndRespond(&core.RedisCmd{Cmd: "SET", Args: []string{"expired", "value", "ex", "10"}}, mockReadWriter, timeProvider)
+	t.Run("GET value of a key when it is expired", func(t *testing.T) {
+
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "GET", Args: []string{"expired"}}, mockReadWriter, timeProvider)
+
+		want := "$-1\r\n"
+		if !bytes.Equal(mockReadWriter.LastWrite, []byte(want)) {
+			t.Errorf("got %v, want %v", string(mockReadWriter.LastWrite), want)
+		}
+	})
 }

@@ -70,7 +70,8 @@ func readCommand(c io.ReadWriter) (*core.RedisCmd, error) {
 }
 
 func respond(c io.ReadWriter, cmd *core.RedisCmd) {
-	err := core.EvalAndRespond(cmd, c)
+	realTimeProvider := core.NewRealTimeProvider()
+	err := core.EvalAndRespond(cmd, c, realTimeProvider)
 	if err != nil {
 		respondError(err, c)
 	}

@@ -3,7 +3,8 @@ package core
 var store map[string]*Obj
 
 type Obj struct {
-	Value interface{}
+	Value     interface{}
+	ValidTill int
 }
 
 func init() {
@@ -14,6 +15,16 @@ func Put(key string, value *Obj) {
 	store[key] = value
 }
 
-func NewObj(value interface{}) *Obj {
-	return &Obj{Value: value}
+func Get(k string) *Obj {
+	if v, ok := store[k]; ok {
+		return v
+	}
+	return nil
+}
+
+func NewObj(value interface{}, validTill int) *Obj {
+	return &Obj{
+		Value:     value,
+		ValidTill: validTill,
+	}
 }
