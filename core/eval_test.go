@@ -173,12 +173,62 @@ func TestGETCommand(t *testing.T) {
 func TestGETCommandWithValueExpired(t *testing.T) {
 
 	mockReadWriter, timeProvider := setupTest()
-	core.EvalAndRespond(&core.RedisCmd{Cmd: "SET", Args: []string{"expired", "value", "ex", "10"}}, mockReadWriter, timeProvider)
 	t.Run("GET value of a key when it is expired", func(t *testing.T) {
 
 		core.EvalAndRespond(&core.RedisCmd{Cmd: "GET", Args: []string{"expired"}}, mockReadWriter, timeProvider)
 
 		want := "$-1\r\n"
+		if !bytes.Equal(mockReadWriter.LastWrite, []byte(want)) {
+			t.Errorf("got %v, want %v", string(mockReadWriter.LastWrite), want)
+		}
+	})
+}
+
+func TestTTLCommand(t *testing.T) {
+
+	t.Run("TTL when key has not expired", func(t *testing.T) {
+		mockReadWriter, _ := setupTest()
+		timeProvider := core.RealTimeProvider{}
+
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "SET", Args: []string{"key", "value", "ex", "100"}}, mockReadWriter, timeProvider)
+		want := ":100\r\n"
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "TTL", Args: []string{"key"}}, mockReadWriter, timeProvider)
+
+		if !bytes.Equal(mockReadWriter.LastWrite, []byte(want)) {
+			t.Errorf("got %v, want %v", string(mockReadWriter.LastWrite), want)
+		}
+	})
+
+	t.Run("TTL when key has expired", func(t *testing.T) {
+		mockReadWriter, timeProvider := setupTest()
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "SET", Args: []string{"key", "value", "ex", "10"}}, mockReadWriter, timeProvider)
+		want := ":-2\r\n"
+
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "TTL", Args: []string{"key"}}, mockReadWriter, timeProvider)
+
+		if !bytes.Equal(mockReadWriter.LastWrite, []byte(want)) {
+			t.Errorf("got %v, want %v", string(mockReadWriter.LastWrite), want)
+		}
+	})
+
+	t.Run("TTL when key has not expiry set", func(t *testing.T) {
+		mockReadWriter, timeProvider := setupTest()
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "SET", Args: []string{"key", "value"}}, mockReadWriter, timeProvider)
+		want := ":-1\r\n"
+
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "TTL", Args: []string{"key"}}, mockReadWriter, timeProvider)
+
+		if !bytes.Equal(mockReadWriter.LastWrite, []byte(want)) {
+			t.Errorf("got %v, want %v", string(mockReadWriter.LastWrite), want)
+		}
+	})
+
+	t.Run("TTL when key does not exist", func(t *testing.T) {
+		mockReadWriter, timeProvider := setupTest()
+
+		want := ":-2\r\n"
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "TTL", Args: []string{"nonexistentkey"}}, mockReadWriter, timeProvider)
+
 		if !bytes.Equal(mockReadWriter.LastWrite, []byte(want)) {
 			t.Errorf("got %v, want %v", string(mockReadWriter.LastWrite), want)
 		}

@@ -64,6 +64,20 @@ func evalGet(args []string, c io.ReadWriter) error {
 	return err
 }
 
+func evalTtl(args []string, c io.ReadWriter) error {
+	if len(args) != 1 {
+		return errors.New("invalid arguments")
+	}
+
+	obj := Get(strings.ToUpper(args[0]))
+	ttl := ttlOf(obj)
+
+	b := Encode(ttl, false)
+	_, err := c.Write(b)
+
+	return err
+}
+
 func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter, timeProvider TimeProvider) error {
 
 	switch cmd.Cmd {
@@ -73,6 +87,8 @@ func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter, timeProvider TimeProvider) e
 		return evalSet(cmd.Args, c, timeProvider)
 	case "GET":
 		return evalGet(cmd.Args, c)
+	case "TTL":
+		return evalTtl(cmd.Args, c)
 	default:
 		return evalPing(cmd.Args, c)
 	}
@@ -111,4 +127,18 @@ func valueOf(obj *Obj) interface{} {
 		return nil
 	}
 	return obj.Value
+}
+
+func ttlOf(obj *Obj) int {
+	if obj == nil {
+		return -2
+	}
+	if obj.ValidTill == -1 {
+		return -1
+	}
+	if obj.ValidTill < int(time.Now().Unix()) {
+		return -2
+	}
+	return obj.ValidTill - int(time.Now().Unix())
+
 }

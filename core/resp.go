@@ -110,7 +110,11 @@ func Encode(value interface{}, isSimple bool) []byte {
 	if isSimple {
 		return []byte(fmt.Sprintf("+%s\r\n", value))
 	} else {
-		return []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(value.(string)), value))
+		if v, ok := value.(int); ok {
+			return []byte(fmt.Sprintf(":%d\r\n", v))
+		} else {
+			return []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(value.(string)), value))
+		}
 	}
 }
 
