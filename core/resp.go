@@ -107,14 +107,18 @@ func Encode(value interface{}, isSimple bool) []byte {
 	if value == nil {
 		return []byte("$-1\r\n")
 	}
-	if isSimple {
-		return []byte(fmt.Sprintf("+%s\r\n", value))
-	} else {
-		if v, ok := value.(int); ok {
-			return []byte(fmt.Sprintf(":%d\r\n", v))
-		} else {
-			return []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(value.(string)), value))
+
+	switch v := value.(type) {
+	case string:
+		if isSimple {
+			return []byte(fmt.Sprintf("+%s\r\n", v))
 		}
+		return []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(v), v))
+
+	case int, int32, int64:
+		return []byte(fmt.Sprintf(":%d\r\n", v))
+	default:
+		return []byte("$-1\r\n")
 	}
 }
 
