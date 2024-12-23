@@ -234,3 +234,36 @@ func TestTTLCommand(t *testing.T) {
 		}
 	})
 }
+
+func TestDELCommadn(t *testing.T) {
+
+	mockReadWriter, timeProvider := setupTest()
+
+	t.Run("delete multiple keys", func(t *testing.T) {
+		keysToDelete := []string{"k1", "k2", "k3", "k4"}
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "SET", Args: []string{"k1", "v1"}}, mockReadWriter, timeProvider)
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "SET", Args: []string{"k2", "v2"}}, mockReadWriter, timeProvider)
+		want := []byte(":2\r\n")
+
+		core.EvalAndRespond(&core.RedisCmd{
+			Cmd:  "DEL",
+			Args: keysToDelete,
+		}, mockReadWriter, timeProvider)
+
+		if !bytes.Equal(mockReadWriter.LastWrite, want) {
+			t.Errorf("got %v, want %v", string(mockReadWriter.LastWrite), string(want))
+		}
+	})
+
+	t.Run("delete a non existent key", func(t *testing.T) {
+		want := []byte(":0\r\n")
+		core.EvalAndRespond(&core.RedisCmd{
+			Cmd:  "DEL",
+			Args: []string{"nonexistentkey"},
+		}, mockReadWriter, timeProvider)
+
+		if !bytes.Equal(mockReadWriter.LastWrite, want) {
+			t.Errorf("got %v, want %v", string(mockReadWriter.LastWrite), string(want))
+		}
+	})
+}

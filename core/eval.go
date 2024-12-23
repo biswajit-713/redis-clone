@@ -51,7 +51,7 @@ func evalGet(args []string, c io.ReadWriter) error {
 	if len(args) != 1 {
 		return errors.New("invalid arguments")
 	}
-	obj := Get(strings.ToUpper(args[0]))
+	obj := Get(args[0])
 	value := valueOf(obj)
 
 	var b []byte
@@ -69,12 +69,26 @@ func evalTtl(args []string, c io.ReadWriter) error {
 		return errors.New("invalid arguments")
 	}
 
-	obj := Get(strings.ToUpper(args[0]))
+	obj := Get(args[0])
 	ttl := ttlOf(obj)
 
 	b := Encode(ttl, false)
 	_, err := c.Write(b)
 
+	return err
+}
+
+func evalDel(args []string, c io.ReadWriter) error {
+
+	var deletedKeys = 0
+	for _, k := range args {
+		if ok := Delete(k); ok {
+			deletedKeys++
+		}
+	}
+
+	b := Encode(deletedKeys, false)
+	_, err := c.Write(b)
 	return err
 }
 
@@ -89,6 +103,8 @@ func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter, timeProvider TimeProvider) e
 		return evalGet(cmd.Args, c)
 	case "TTL":
 		return evalTtl(cmd.Args, c)
+	case "DEL":
+		return evalDel(cmd.Args, c)
 	default:
 		return evalPing(cmd.Args, c)
 	}
