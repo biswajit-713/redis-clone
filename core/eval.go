@@ -92,6 +92,33 @@ func evalDel(args []string, c io.ReadWriter) error {
 	return err
 }
 
+func evalExpire(args []string, c io.ReadWriter, t TimeProvider) error {
+
+	if len(args) != 2 {
+		return errors.New("EXPIRE command - invalid arguments")
+	}
+
+	_, err := strconv.ParseInt(args[1], 10, 64)
+	if err != nil {
+		return errors.New("EXPIRE command - invalid arguments")
+	}
+
+	var b []byte
+
+	v := Get(args[0])
+	if v == nil {
+		b = Encode(0, false)
+	} else if v.HasExpired() {
+		b = Encode(0, false)
+	} else {
+		evalSet([]string{args[0], v.Value.(string), "ex", args[1]}, c, t)
+		b = Encode(1, false)
+	}
+
+	_, err = c.Write(b)
+	return err
+}
+
 func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter, timeProvider TimeProvider) error {
 
 	switch cmd.Cmd {
@@ -105,6 +132,8 @@ func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter, timeProvider TimeProvider) e
 		return evalTtl(cmd.Args, c)
 	case "DEL":
 		return evalDel(cmd.Args, c)
+	case "EXPIRE":
+		return evalExpire(cmd.Args, c, timeProvider)
 	default:
 		return evalPing(cmd.Args, c)
 	}

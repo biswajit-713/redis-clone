@@ -1,9 +1,13 @@
 package core
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 var store map[string]*Obj
 
+// TODO - make the attributes private and provie public wrapper method to access the attributes
 type Obj struct {
 	Value     interface{}
 	ValidTill int
@@ -38,4 +42,12 @@ func NewObj(value interface{}, validTill int) *Obj {
 		Value:     value,
 		ValidTill: validTill,
 	}
+}
+
+func (o Obj) HasExpired() bool {
+	return o.ValidTill != -1 && o.ValidTill < int(time.Now().Unix())
+}
+
+func (o Obj) TtlSet() bool {
+	return o.ValidTill != -1
 }
