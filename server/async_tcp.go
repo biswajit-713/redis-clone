@@ -4,12 +4,15 @@ import (
 	"log"
 	"net"
 	"syscall"
+	"time"
 
 	"github.com/diceclone/config"
 	"github.com/diceclone/core"
 )
 
 // var connectedClients int = 0
+var cronFrequency time.Duration = 1 * time.Second
+var lastCronExectime time.Time = time.Now()
 
 func RunAsyncTCPServer(host string, port int) error {
 	log.Println("starting asynchronous TCP server on ", config.Host, config.Port)
@@ -24,7 +27,7 @@ func RunAsyncTCPServer(host string, port int) error {
 	connectedClients := 0
 	maxClients := 10000
 
-	// create a socket
+	// create a non blocking socket with maximus connections, bind it to ipv4 address and port
 	serverFD, err := createServerSocket(maxClients)
 	if err != nil {
 		return err
@@ -32,15 +35,14 @@ func RunAsyncTCPServer(host string, port int) error {
 	defer syscall.Close(serverFD)
 
 	// do async I/O
-
-	// create a kqueue instance
+	// create a kernel event queue to track events on registered FDs.
 	epollFD, err := syscall.Kqueue()
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer syscall.Close(epollFD)
 
-	// listen for events on the server socket and read those events
+	// ask the kernel event queue to monitor READ event on the server socket
 	socketServerEvent := syscall.Kevent_t{
 		Ident:  uint64(serverFD),
 		Filter: syscall.EVFILT_READ,
@@ -52,7 +54,18 @@ func RunAsyncTCPServer(host string, port int) error {
 	}
 
 	var events []syscall.Kevent_t = make([]syscall.Kevent_t, maxClients)
+
 	for {
+
+		// every one min, run a check on the keys to delete the expired keys
+		// take 20 keys at one time
+		// if more than 25% of the sampled entries have expired, then there are lot of stale items in the cache
+		// run the check again on the next 20 keys
+		if time.Now().After(lastCronExectime.Add(cronFrequency)) {
+			core.SafeDeleteExpiredKeys()
+			lastCronExectime = time.Now()
+		}
+
 		nEvents, err := syscall.Kevent(epollFD, nil, events[:], nil)
 		if err != nil {
 			continue

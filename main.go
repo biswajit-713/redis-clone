@@ -19,6 +19,6 @@ func main() {
 	setUpFlags()
 	log.Println("rolling the dice")
 
-	server.RunSyncTCPServer("0.0.0.0", 7379)
-	// server.RunAsyncTCPServer("0.0.0.0", 7379)
+	server.RunSyncTCPServer(config.Host, config.Port)
+	// server.RunAsyncTCPServer(config.Host, config.Port)
 }
