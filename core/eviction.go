@@ -5,12 +5,12 @@ import (
 )
 
 type EvictionStrategy interface {
-	Evict(store map[string]*Obj)
+	evict(store map[string]*Obj)
 }
 
 type EvictFirst struct{}
 
-func (e *EvictFirst) Evict(store map[string]*Obj) {
+func (e *EvictFirst) evict(store map[string]*Obj) {
 	for k := range store {
 		delete(store, k)
 		break
@@ -30,5 +30,5 @@ func getEvictionStrategy() EvictionStrategy {
 
 func evict() {
 	strategy := getEvictionStrategy()
-	strategy.Evict(store)
+	strategy.evict(store)
 }

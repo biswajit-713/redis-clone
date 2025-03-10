@@ -35,7 +35,7 @@ func RunAsyncTCPServer(host string, port int) error {
 	defer syscall.Close(serverFD)
 
 	// do async I/O
-	// create a kernel event queue to track events on registered FDs.
+	// create a kernel event queue to track events on registered FDs, equivalent to EPOLL_CREATE
 	epollFD, err := syscall.Kqueue()
 	if err != nil {
 		log.Fatal(err)
@@ -48,6 +48,8 @@ func RunAsyncTCPServer(host string, port int) error {
 		Filter: syscall.EVFILT_READ,
 		Flags:  syscall.EV_ADD | syscall.EV_ENABLE,
 	}
+
+	// equivalent of EPOLL_CTL
 	_, err = syscall.Kevent(epollFD, []syscall.Kevent_t{socketServerEvent}, nil, nil)
 	if err != nil {
 		log.Fatal(err)
@@ -66,6 +68,7 @@ func RunAsyncTCPServer(host string, port int) error {
 			lastCronExectime = time.Now()
 		}
 
+		// equivalent of EPOLL_WAIT
 		nEvents, err := syscall.Kevent(epollFD, nil, events[:], nil)
 		if err != nil {
 			continue
@@ -87,6 +90,8 @@ func RunAsyncTCPServer(host string, port int) error {
 					Filter: syscall.EVFILT_READ,
 					Flags:  syscall.EV_ADD | syscall.EV_ENABLE,
 				}
+
+				// equivalent of EPOLL_CTL; register the new client FD with epoll
 				_, err = syscall.Kevent(epollFD, []syscall.Kevent_t{socketClientEvent}, nil, nil)
 				if err != nil {
 					log.Fatal(err)
