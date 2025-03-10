@@ -3,11 +3,13 @@ package core
 import (
 	"strings"
 	"time"
+
+	"github.com/diceclone/config"
 )
 
 var store map[string]*Obj
 
-// TODO - make the attributes private and provie public wrapper method to access the attributes
+// TODO - make the attributes private and provide public wrapper method to access the attributes
 type Obj struct {
 	Value     interface{}
 	ValidTill int
@@ -18,6 +20,10 @@ func init() {
 }
 
 func Put(key string, value *Obj) {
+	if len(store) >= config.KeysLimit {
+		evict()
+	}
+
 	store[strings.ToUpper(key)] = value
 }
 
