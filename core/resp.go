@@ -44,8 +44,7 @@ func readInt64(data []byte) (int64, int, error) {
 func readBulkstring(data []byte) (string, int, error) {
 
 	length, delta := readLength(data)
-
-	var bulkstringStartPosition = 3
+	var bulkstringStartPosition = delta
 	var result []byte
 	for i := bulkstringStartPosition; data[i] != '\r' && i < bulkstringStartPosition+int(length); i++ {
 		result = append(result, data[i])
@@ -68,7 +67,6 @@ func readArray(data []byte) (interface{}, int, error) {
 		result = append(result, response)
 		nextPos += delta
 	}
-
 	return result, 0, nil
 }
 

@@ -57,3 +57,21 @@ func (o Obj) HasExpired() bool {
 func (o Obj) TtlSet() bool {
 	return o.ValidTill != -1
 }
+
+func IterateStore() <-chan *KeyValuePair {
+	ch := make(chan *KeyValuePair)
+
+	go func() {
+		defer close(ch)
+		for key, obj := range store {
+			ch <- &KeyValuePair{Key: key, Value: obj}
+		}
+	}()
+
+	return ch
+}
+
+type KeyValuePair struct {
+	Key   string
+	Value *Obj
+}

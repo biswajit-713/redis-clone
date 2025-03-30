@@ -1,11 +1,16 @@
 package core
 
 import (
+	"bufio"
 	"errors"
+	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/diceclone/config"
 )
 
 func evalPing(args []string, c io.ReadWriter) error {
@@ -119,8 +124,41 @@ func evalExpire(args []string, c io.ReadWriter, t TimeProvider) error {
 	return err
 }
 
-func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter, timeProvider TimeProvider) error {
+func evalBackgroundRewriteAof() error {
 
+	aofFile := config.AppendOnlyFile
+	tempAofFile := fmt.Sprintf("%d-%s", time.Now().Unix(), config.AppendOnlyFile)
+	file, err := os.Create(tempAofFile)
+	if err != nil {
+		fmt.Println("Error creating file: ", err)
+		return err
+	}
+	defer file.Close()
+
+	writer := bufio.NewWriterSize(file, 4096)
+
+	for pair := range IterateStore() {
+		_, err := writer.Write([]byte(fmt.Sprintf("*3\r\n$3\r\nSET\r\n$%d\r\n%s\r\n$%d\r\n%s\r\n", len(pair.Key), pair.Key, len(pair.Value.Value.(string)), pair.Value.Value)))
+		if err != nil {
+			fmt.Println("Error writing to file: ", err)
+			return err
+		}
+	}
+
+	err = writer.Flush()
+	if err != nil {
+		fmt.Println("Error flushing writer: ", err)
+		return err
+	}
+	err = os.Rename(tempAofFile, aofFile)
+	if err != nil {
+		fmt.Println("Error renaming file: ", err)
+		return err
+	}
+	return nil
+}
+
+func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter, timeProvider TimeProvider) error {
 	switch cmd.Cmd {
 	case "PING":
 		return evalPing(cmd.Args, c)
@@ -134,6 +172,8 @@ func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter, timeProvider TimeProvider) e
 		return evalDel(cmd.Args, c)
 	case "EXPIRE":
 		return evalExpire(cmd.Args, c, timeProvider)
+	case "BGREWRITEAOF":
+		return evalBackgroundRewriteAof()
 	default:
 		return evalPing(cmd.Args, c)
 	}

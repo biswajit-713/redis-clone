@@ -3,10 +3,12 @@ package core_test
 import (
 	"bytes"
 	"errors"
+	"os"
 	"reflect"
 	"testing"
 	"time"
 
+	"github.com/diceclone/config"
 	"github.com/diceclone/core"
 )
 
@@ -397,6 +399,31 @@ func TestEXPIRECommand(t *testing.T) {
 
 		if got.Error() != want.Error() {
 			t.Errorf("got %v, want %v", got, want)
+		}
+	})
+}
+
+func TestBGREWRITEAOFCommand(t *testing.T) {
+
+	// TODO - the test should verify that the bgrewrite is invoked
+	t.Run("rewrite state to AOF in background", func(t *testing.T) {
+		mockReadWriter, timeProvider := setupTest()
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "SET", Args: []string{"K1", "V1"}}, mockReadWriter, timeProvider)
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "SET", Args: []string{"K2", "V2"}}, mockReadWriter, timeProvider)
+
+		core.EvalAndRespond(&core.RedisCmd{
+			Cmd:  "BGREWRITEAOF",
+			Args: []string{},
+		}, &MockReadWriter{}, MockTimeProvider{})
+
+		// Verify the AOF file content
+		content, _ := os.ReadFile(config.AppendOnlyFile)
+		os.Remove(config.AppendOnlyFile)
+		expectedContents := []string{"*3\r\n$3\r\nSET\r\n$2\r\nK1\r\n$2\r\nV1\r\n", "*3\r\n$3\r\nSET\r\n$2\r\nK2\r\n$2\r\nV2\r\n"}
+		for _, want := range expectedContents {
+			if !bytes.Contains(content, []byte(want)) {
+				t.Errorf("AOF content does not contain expected entry:\nGot:\n%s\nWant:\n%s", string(content), want)
+			}
 		}
 	})
 }

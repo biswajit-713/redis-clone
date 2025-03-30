@@ -50,8 +50,9 @@ func TestInt64(t *testing.T) {
 
 func TestBulkString(t *testing.T) {
 	cases := map[string]string{
-		"$5\r\nhello\r\n": "hello",
-		"$0\r\n\r\n":      "",
+		"$5\r\nhello\r\n":         "hello",
+		"$0\r\n\r\n":              "",
+		"$12\r\nbgrewriteaof\r\n": "bgrewriteaof",
 	}
 
 	for input, want := range cases {

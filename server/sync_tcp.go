@@ -56,12 +56,10 @@ func readCommand(c io.ReadWriter) (*core.RedisCmd, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	tokens, err := core.DecodeArrayString(buf[:n])
 	if err != nil {
 		return nil, err
 	}
-
 	return &core.RedisCmd{
 		Cmd:  strings.ToUpper(tokens[0]),
 		Args: tokens[1:],
