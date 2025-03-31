@@ -1,0 +1,11 @@
+#!/bin/sh
+
+echo "Running tests before pushing..."
+if ! go test -v ./...; then
+	echo "Fix tests before pushing."
+	exit 1
+fi
+
+echo "======================================"
+echo "All tests passed. Proceeding with push."
+exit 0
