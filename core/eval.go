@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strconv"
 	"strings"
@@ -127,6 +128,23 @@ func evalExpire(args []string, c io.ReadWriter, t TimeProvider) error {
 func evalBackgroundRewriteAof() error {
 
 	aofFile := config.AppendOnlyFile
+
+	fileInfo, err := os.Stat(aofFile)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			fmt.Println("aof file not present, to be created")
+			return nil
+		} else {
+			fmt.Println("Error retrieving file info: ", err)
+		}
+	}
+
+	modTime := fileInfo.ModTime()
+	if time.Since(modTime) < 5*time.Minute {
+		fmt.Printf("Skipping writing to aof. The existing aof is still fresh")
+		return nil
+	}
+
 	tempAofFile := fmt.Sprintf("%d-%s", time.Now().Unix(), config.AppendOnlyFile)
 	file, err := os.Create(tempAofFile)
 	if err != nil {

@@ -1,7 +1,5 @@
 package core
 
-import "log"
-
 func expireSample() float32 {
 	var limit = 20
 	var deletedKeys = 0
@@ -30,5 +28,4 @@ func SafeDeleteExpiredKeys() {
 			break
 		}
 	}
-	log.Println("Deleted expired keys. total keys: ", len(store))
 }
