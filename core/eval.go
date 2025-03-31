@@ -151,21 +151,25 @@ func evalBackgroundRewriteAof() error {
 
 	aofFile := config.AppendOnlyFile
 
-	fileInfo, err := os.Stat(aofFile)
+	_, err := os.Stat(aofFile)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			fmt.Println("aof file not present, to be created")
-			return nil
+			if _, err := os.Create(aofFile); err != nil {
+				fmt.Println("Unable to create aof: ", err)
+			}
 		} else {
 			fmt.Println("Error retrieving file info: ", err)
 		}
 	}
 
-	modTime := fileInfo.ModTime()
-	if time.Since(modTime) < 5*time.Minute {
-		fmt.Printf("Skipping writing to aof. The existing aof is still fresh")
-		return nil
-	}
+	// TODO - refactor this code to move decisioning on AOF to an outside process, preferably in the async_tcp.go
+	// TODO - where the BGREWRITEAOF can be called based on the modification time
+	// fileInfo, _ := os.Stat(aofFile)
+	// modTime := fileInfo.ModTime()
+	// if time.Since(modTime) < 5*time.Minute {
+	// 	fmt.Printf("Skipping writing to aof. The existing aof is still fresh")
+	// 	return nil
+	// }
 
 	tempAofFile := fmt.Sprintf("%d-%s", time.Now().Unix(), config.AppendOnlyFile)
 	file, err := os.Create(tempAofFile)

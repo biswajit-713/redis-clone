@@ -408,8 +408,8 @@ func TestBGREWRITEAOFCommand(t *testing.T) {
 	// TODO - the test should verify that the bgrewrite is invoked
 	t.Run("rewrite state to AOF in background", func(t *testing.T) {
 		mockReadWriter, timeProvider := setupTest()
-		core.EvalAndRespond(&core.RedisCmd{Cmd: "SET", Args: []string{"K1", "V1"}}, mockReadWriter, timeProvider)
-		core.EvalAndRespond(&core.RedisCmd{Cmd: "SET", Args: []string{"K2", "V2"}}, mockReadWriter, timeProvider)
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "SET", Args: []string{"BGK1", "V1"}}, mockReadWriter, timeProvider)
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "SET", Args: []string{"BGK2", "V2"}}, mockReadWriter, timeProvider)
 
 		core.EvalAndRespond(&core.RedisCmd{
 			Cmd:  "BGREWRITEAOF",
@@ -419,7 +419,7 @@ func TestBGREWRITEAOFCommand(t *testing.T) {
 		// Verify the AOF file content
 		content, _ := os.ReadFile(config.AppendOnlyFile)
 		os.Remove(config.AppendOnlyFile)
-		expectedContents := []string{"*3\r\n$3\r\nSET\r\n$2\r\nK1\r\n$2\r\nV1\r\n", "*3\r\n$3\r\nSET\r\n$2\r\nK2\r\n$2\r\nV2\r\n"}
+		expectedContents := []string{"*3\r\n$3\r\nSET\r\n$4\r\nBGK1\r\n$2\r\nV1\r\n", "*3\r\n$3\r\nSET\r\n$4\r\nBGK2\r\n$2\r\nV2\r\n"}
 		for _, want := range expectedContents {
 			if !bytes.Contains(content, []byte(want)) {
 				t.Errorf("AOF content does not contain expected entry:\nGot:\n%s\nWant:\n%s", string(content), want)
