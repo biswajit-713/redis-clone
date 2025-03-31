@@ -125,6 +125,28 @@ func evalExpire(args []string, c io.ReadWriter, t TimeProvider) error {
 	return err
 }
 
+func evalIncrement(args []string, c io.ReadWriter) error {
+
+	// fetch the value from store
+	v := Get(args[0])
+
+	var value int64 = -1
+	var err error
+	if v == nil {
+		value = 0
+	} else {
+		value, err = strconv.ParseInt(v.Value.(string), 10, 64)
+		if err != nil {
+			return errors.New("ERR value is not an integer or out of range")
+		}
+	}
+
+	b := Encode(value+1, false)
+	_, err = c.Write(b)
+
+	return err
+}
+
 func evalBackgroundRewriteAof() error {
 
 	aofFile := config.AppendOnlyFile
@@ -190,6 +212,8 @@ func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter, timeProvider TimeProvider) e
 		return evalDel(cmd.Args, c)
 	case "EXPIRE":
 		return evalExpire(cmd.Args, c, timeProvider)
+	case "INCR":
+		return evalIncrement(cmd.Args, c)
 	case "BGREWRITEAOF":
 		return evalBackgroundRewriteAof()
 	default:

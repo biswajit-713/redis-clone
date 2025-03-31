@@ -427,3 +427,40 @@ func TestBGREWRITEAOFCommand(t *testing.T) {
 		}
 	})
 }
+
+func TestINCRCommand(t *testing.T) {
+	t.Run("increment the value of an existing key", func(t *testing.T) {
+
+		mockReadWriter, timeProvider := setupTest()
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "SET", Args: []string{"K1", "3"}}, mockReadWriter, timeProvider)
+		want := []byte(":4\r\n")
+
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "INCR", Args: []string{"K1"}}, mockReadWriter, timeProvider)
+
+		got := mockReadWriter.LastWrite
+		if !bytes.Equal(got, want) {
+			t.Errorf("got: %v, want: %v", string(got), string(want))
+		}
+	})
+
+	t.Run("increment a key that does not exist", func(t *testing.T) {
+		mockReadWriter, timeProvider := setupTest()
+		want := []byte(":1\r\n")
+
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "INCR", Args: []string{"keydoesnotexist"}}, mockReadWriter, timeProvider)
+
+		got := mockReadWriter.LastWrite
+		if !bytes.Equal(got, want) {
+			t.Errorf("got: %v, want: %v", got, want)
+		}
+	})
+
+	t.Run("increment when value is not an integer", func(t *testing.T) {
+
+	})
+
+	t.Run("throw error when command is not correct", func(t *testing.T) {
+
+	})
+
+}
