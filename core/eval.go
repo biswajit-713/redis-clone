@@ -14,7 +14,7 @@ import (
 	"github.com/diceclone/config"
 )
 
-func evalPing(args []string, c io.ReadWriter) []byte {
+func evalPing(args []string) []byte {
 	var b []byte
 
 	if len(args) > 1 {
@@ -30,7 +30,7 @@ func evalPing(args []string, c io.ReadWriter) []byte {
 	return b
 }
 
-func evalSet(args []string, c io.ReadWriter, timeProvider TimeProvider) []byte {
+func evalSet(args []string, timeProvider TimeProvider) []byte {
 
 	if len(args) < 2 {
 		return Encode(errors.New("missing parameters"), false)
@@ -50,7 +50,7 @@ func evalSet(args []string, c io.ReadWriter, timeProvider TimeProvider) []byte {
 	return Encode("OK", true)
 }
 
-func evalGet(args []string, c io.ReadWriter) []byte {
+func evalGet(args []string) []byte {
 	if len(args) != 1 {
 		return Encode(errors.New("invalid arguments"), false)
 	}
@@ -66,7 +66,7 @@ func evalGet(args []string, c io.ReadWriter) []byte {
 	return b
 }
 
-func evalTtl(args []string, c io.ReadWriter) []byte {
+func evalTtl(args []string) []byte {
 	if len(args) != 1 {
 		return Encode(errors.New("invalid arguments"), false)
 	}
@@ -78,7 +78,7 @@ func evalTtl(args []string, c io.ReadWriter) []byte {
 
 }
 
-func evalDel(args []string, c io.ReadWriter) []byte {
+func evalDel(args []string) []byte {
 
 	var deletedKeys = 0
 	for _, k := range args {
@@ -107,7 +107,7 @@ func evalExpire(args []string, c io.ReadWriter, t TimeProvider) []byte {
 	} else if v.HasExpired() {
 		return Encode(0, false)
 	} else {
-		evalSet([]string{args[0], v.Value.(string), "ex", args[1]}, c, t)
+		evalSet([]string{args[0], v.Value.(string), "ex", args[1]}, t)
 		return Encode(1, false)
 	}
 
@@ -196,15 +196,15 @@ func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter, timeProvider TimeProvider) e
 	var buf []byte
 	switch cmd.Cmd {
 	case "PING":
-		buf = evalPing(cmd.Args, c)
+		buf = evalPing(cmd.Args)
 	case "SET":
-		buf = evalSet(cmd.Args, c, timeProvider)
+		buf = evalSet(cmd.Args, timeProvider)
 	case "GET":
-		buf = evalGet(cmd.Args, c)
+		buf = evalGet(cmd.Args)
 	case "TTL":
-		buf = evalTtl(cmd.Args, c)
+		buf = evalTtl(cmd.Args)
 	case "DEL":
-		buf = evalDel(cmd.Args, c)
+		buf = evalDel(cmd.Args)
 	case "EXPIRE":
 		buf = evalExpire(cmd.Args, c, timeProvider)
 	case "INCR":
@@ -212,7 +212,7 @@ func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter, timeProvider TimeProvider) e
 	case "BGREWRITEAOF":
 		buf = evalBackgroundRewriteAof()
 	default:
-		buf = evalPing(cmd.Args, c)
+		buf = evalPing(cmd.Args)
 	}
 
 	_, err := c.Write(buf)
