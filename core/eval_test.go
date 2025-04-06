@@ -2,9 +2,7 @@ package core_test
 
 import (
 	"bytes"
-	"errors"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -94,41 +92,39 @@ func TestPINGCommand(t *testing.T) {
 
 func TestSETCommand(t *testing.T) {
 	cases := []struct {
-		name      string
-		command   string
-		argument  []string
-		want      interface{}
-		wantWrite []byte
+		name     string
+		command  string
+		argument []string
+		want     []byte
 	}{
 		{
-			name:      "SET with key and value",
-			command:   "SET",
-			argument:  []string{"key", "value"},
-			want:      nil,
-			wantWrite: []byte("+OK\r\n"),
+			name:     "SET with key and value",
+			command:  "SET",
+			argument: []string{"key", "value"},
+			want:     []byte("+OK\r\n"),
 		},
 		{
-			name:      "SET with only key and no value",
-			command:   "SET",
-			argument:  []string{"key"},
-			want:      errors.New("missing parameters"),
-			wantWrite: []byte(""),
+			name:     "SET with only key and no value",
+			command:  "SET",
+			argument: []string{"key"},
+			want:     []byte("-missing parameters\r\n"),
 		},
 	}
 
 	for _, tc := range cases {
 		mockReadWriter, timeProvider := setupTest()
 		t.Run(tc.name, func(t *testing.T) {
-			got := core.EvalAndRespond(&core.RedisCmd{
+			core.EvalAndRespond(&core.RedisCmd{
 				Cmd: tc.command, Args: tc.argument,
 			}, mockReadWriter, timeProvider)
 
-			if !reflect.DeepEqual(got, tc.want) {
-				t.Errorf("got %v, want %v", reflect.TypeOf(got), reflect.TypeOf(tc.want))
-			}
+			got := mockReadWriter.LastWrite
+			// if !reflect.DeepEqual(got, tc.want) {
+			// 	t.Errorf("got %v, want %v", reflect.TypeOf(got), reflect.TypeOf(tc.want))
+			// }
 
-			if !bytes.Equal(mockReadWriter.LastWrite, tc.wantWrite) {
-				t.Errorf("got %v, want %v", string(mockReadWriter.LastWrite), string(tc.wantWrite))
+			if !bytes.Equal(got, tc.want) {
+				t.Errorf("got %v, want %v", string(mockReadWriter.LastWrite), string(tc.want))
 			}
 		})
 	}
@@ -314,7 +310,6 @@ func TestEXPIRECommand(t *testing.T) {
 		}
 	})
 
-	// expire a key with a valid ttl - update the ttl to the new value -> return 1
 	t.Run("expire a key with a valid ttl", func(t *testing.T) {
 		timeProvider := core.RealTimeProvider{}
 
@@ -377,27 +372,29 @@ func TestEXPIRECommand(t *testing.T) {
 	})
 
 	t.Run("expire with missing arguments", func(t *testing.T) {
-		want := errors.New("EXPIRE command - invalid arguments")
+		want := []byte("-EXPIRE command - invalid arguments\r\n")
 
-		got := core.EvalAndRespond(&core.RedisCmd{
+		core.EvalAndRespond(&core.RedisCmd{
 			Cmd:  "EXPIRE",
 			Args: []string{},
 		}, mockReadWriter, timeProvider)
 
-		if got.Error() != want.Error() {
+		got := mockReadWriter.LastWrite
+		if !bytes.Equal(got, want) {
 			t.Errorf("got %v, want %v", got, want)
 		}
 	})
 
 	t.Run("expire with invalid ttl", func(t *testing.T) {
-		want := errors.New("EXPIRE command - invalid arguments")
+		want := []byte("-EXPIRE command - invalid arguments\r\n")
 
-		got := core.EvalAndRespond(&core.RedisCmd{
+		core.EvalAndRespond(&core.RedisCmd{
 			Cmd:  "EXPIRE",
 			Args: []string{"key", "invalid ttl"},
 		}, mockReadWriter, timeProvider)
 
-		if got.Error() != want.Error() {
+		got := mockReadWriter.LastWrite
+		if !bytes.Equal(got, want) {
 			t.Errorf("got %v, want %v", got, want)
 		}
 	})
@@ -414,7 +411,7 @@ func TestBGREWRITEAOFCommand(t *testing.T) {
 		core.EvalAndRespond(&core.RedisCmd{
 			Cmd:  "BGREWRITEAOF",
 			Args: []string{},
-		}, &MockReadWriter{}, MockTimeProvider{})
+		}, mockReadWriter, timeProvider)
 
 		// Verify the AOF file content
 		content, _ := os.ReadFile(config.AppendOnlyFile)
@@ -456,7 +453,17 @@ func TestINCRCommand(t *testing.T) {
 	})
 
 	t.Run("increment when value is not an integer", func(t *testing.T) {
+		mockReadWriter, timeProvider := setupTest()
+		want := []byte("-operation not permitted on this encoding\r\n")
 
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "SET", Args: []string{"K1", "V1"}}, mockReadWriter, timeProvider)
+
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "INCR", Args: []string{"K1"}}, mockReadWriter, timeProvider)
+
+		got := mockReadWriter.LastWrite
+		if !bytes.Equal(got, want) {
+			t.Errorf("got: %v, want: %v", string(got), string(want))
+		}
 	})
 
 	t.Run("throw error when command is not correct", func(t *testing.T) {

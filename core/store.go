@@ -10,10 +10,7 @@ import (
 var store map[string]*Obj
 
 // TODO - make the attributes private and provide public wrapper method to access the attributes
-type Obj struct {
-	Value     interface{}
-	ValidTill int
-}
+// TODO - Obj has TypeEncoding field, as of now it will support only integer, raw string and embedded string
 
 func init() {
 	store = make(map[string]*Obj)
@@ -41,13 +38,6 @@ func Delete(k string) bool {
 	}
 
 	return false
-}
-
-func NewObj(value interface{}, validTill int) *Obj {
-	return &Obj{
-		Value:     value,
-		ValidTill: validTill,
-	}
 }
 
 func (o Obj) HasExpired() bool {

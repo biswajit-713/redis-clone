@@ -14,11 +14,11 @@ import (
 	"github.com/diceclone/config"
 )
 
-func evalPing(args []string, c io.ReadWriter) error {
+func evalPing(args []string, c io.ReadWriter) []byte {
 	var b []byte
 
 	if len(args) > 1 {
-		return errors.New("ERR wrong number of arguments for 'ping' command")
+		return Encode(errors.New("ERR wrong number of arguments for 'ping' command"), false)
 	}
 
 	if len(args) == 0 {
@@ -27,35 +27,32 @@ func evalPing(args []string, c io.ReadWriter) error {
 		b = Encode(args[0], false)
 	}
 
-	_, err := c.Write(b)
-	return err
+	return b
 }
 
-func evalSet(args []string, c io.ReadWriter, timeProvider TimeProvider) error {
+func evalSet(args []string, c io.ReadWriter, timeProvider TimeProvider) []byte {
 
 	if len(args) < 2 {
-		return errors.New("missing parameters")
+		return Encode(errors.New("missing parameters"), false)
 	}
 
 	// build a map with the argument list
 	params := buildSetParams(args)
+	oType, oEncoding := deduceTypeEncoding(params["value"])
 
 	ttl, exists := params["EX"]
 	if exists {
-		Put(params["key"], NewObj(params["value"], validUntil(ttl, timeProvider)))
+		Put(params["key"], NewObj(params["value"], calculateDuration(ttl, timeProvider), oType, oEncoding))
 	} else {
-		Put(params["key"], NewObj(params["value"], -1))
+		Put(params["key"], NewObj(params["value"], -1, oType, oEncoding))
 	}
 
-	b := Encode("OK", true)
-
-	_, err := c.Write(b)
-	return err
+	return Encode("OK", true)
 }
 
-func evalGet(args []string, c io.ReadWriter) error {
+func evalGet(args []string, c io.ReadWriter) []byte {
 	if len(args) != 1 {
-		return errors.New("invalid arguments")
+		return Encode(errors.New("invalid arguments"), false)
 	}
 	obj := Get(args[0])
 	value := valueOf(obj)
@@ -66,25 +63,22 @@ func evalGet(args []string, c io.ReadWriter) error {
 	} else {
 		b = Encode(value, false)
 	}
-	_, err := c.Write([]byte(b))
-	return err
+	return b
 }
 
-func evalTtl(args []string, c io.ReadWriter) error {
+func evalTtl(args []string, c io.ReadWriter) []byte {
 	if len(args) != 1 {
-		return errors.New("invalid arguments")
+		return Encode(errors.New("invalid arguments"), false)
 	}
 
 	obj := Get(args[0])
 	ttl := ttlOf(obj)
 
-	b := Encode(ttl, false)
-	_, err := c.Write(b)
+	return Encode(ttl, false)
 
-	return err
 }
 
-func evalDel(args []string, c io.ReadWriter) error {
+func evalDel(args []string, c io.ReadWriter) []byte {
 
 	var deletedKeys = 0
 	for _, k := range args {
@@ -93,61 +87,57 @@ func evalDel(args []string, c io.ReadWriter) error {
 		}
 	}
 
-	b := Encode(deletedKeys, false)
-	_, err := c.Write(b)
-	return err
+	return Encode(deletedKeys, false)
 }
 
-func evalExpire(args []string, c io.ReadWriter, t TimeProvider) error {
+func evalExpire(args []string, c io.ReadWriter, t TimeProvider) []byte {
 
 	if len(args) != 2 {
-		return errors.New("EXPIRE command - invalid arguments")
+		return Encode(errors.New("EXPIRE command - invalid arguments"), false)
 	}
 
 	_, err := strconv.ParseInt(args[1], 10, 64)
 	if err != nil {
-		return errors.New("EXPIRE command - invalid arguments")
+		return Encode(errors.New("EXPIRE command - invalid arguments"), false)
 	}
-
-	var b []byte
 
 	v := Get(args[0])
 	if v == nil {
-		b = Encode(0, false)
+		return Encode(0, false)
 	} else if v.HasExpired() {
-		b = Encode(0, false)
+		return Encode(0, false)
 	} else {
 		evalSet([]string{args[0], v.Value.(string), "ex", args[1]}, c, t)
-		b = Encode(1, false)
+		return Encode(1, false)
 	}
 
-	_, err = c.Write(b)
-	return err
 }
 
-func evalIncrement(args []string, c io.ReadWriter) error {
+func evalIncrement(args []string) []byte {
 
 	// fetch the value from store
 	v := Get(args[0])
-
-	var value int64 = -1
-	var err error
 	if v == nil {
-		value = 0
-	} else {
-		value, err = strconv.ParseInt(v.Value.(string), 10, 64)
-		if err != nil {
-			return errors.New("ERR value is not an integer or out of range")
-		}
+		Put(args[0], NewObj("0", -1, OBJ_TYPE_STRING, OBJ_ENCODING_INT))
 	}
 
-	b := Encode(value+1, false)
-	_, err = c.Write(b)
+	v = Get(args[0])
 
-	return err
+	if !assertType(v.TypeEncoding, OBJ_TYPE_STRING) {
+		return Encode(errors.New("operation not permitted on this type"), false)
+	}
+	// if the encoding is not integer, throw error
+	if !assertEncoding(v.TypeEncoding, OBJ_ENCODING_INT) {
+		return Encode(errors.New("operation not permitted on this encoding"), false)
+	}
+	result, _ := strconv.ParseInt(v.Value.(string), 10, 64)
+	// convert the value to integer, increment the value and return it
+	v.Value = strconv.FormatInt(result+1, 10)
+
+	return Encode(result+1, false)
 }
 
-func evalBackgroundRewriteAof() error {
+func evalBackgroundRewriteAof() []byte {
 
 	aofFile := config.AppendOnlyFile
 
@@ -175,7 +165,7 @@ func evalBackgroundRewriteAof() error {
 	file, err := os.Create(tempAofFile)
 	if err != nil {
 		fmt.Println("Error creating file: ", err)
-		return err
+		return Encode(err, false)
 	}
 	defer file.Close()
 
@@ -185,47 +175,51 @@ func evalBackgroundRewriteAof() error {
 		_, err := writer.Write([]byte(fmt.Sprintf("*3\r\n$3\r\nSET\r\n$%d\r\n%s\r\n$%d\r\n%s\r\n", len(pair.Key), pair.Key, len(pair.Value.Value.(string)), pair.Value.Value)))
 		if err != nil {
 			fmt.Println("Error writing to file: ", err)
-			return err
+			return Encode(err, false)
 		}
 	}
 
 	err = writer.Flush()
 	if err != nil {
 		fmt.Println("Error flushing writer: ", err)
-		return err
+		return Encode(err, false)
 	}
 	err = os.Rename(tempAofFile, aofFile)
 	if err != nil {
 		fmt.Println("Error renaming file: ", err)
-		return err
+		return Encode(err, false)
 	}
-	return nil
+	return Encode("OK", true)
 }
 
 func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter, timeProvider TimeProvider) error {
+	var buf []byte
 	switch cmd.Cmd {
 	case "PING":
-		return evalPing(cmd.Args, c)
+		buf = evalPing(cmd.Args, c)
 	case "SET":
-		return evalSet(cmd.Args, c, timeProvider)
+		buf = evalSet(cmd.Args, c, timeProvider)
 	case "GET":
-		return evalGet(cmd.Args, c)
+		buf = evalGet(cmd.Args, c)
 	case "TTL":
-		return evalTtl(cmd.Args, c)
+		buf = evalTtl(cmd.Args, c)
 	case "DEL":
-		return evalDel(cmd.Args, c)
+		buf = evalDel(cmd.Args, c)
 	case "EXPIRE":
-		return evalExpire(cmd.Args, c, timeProvider)
+		buf = evalExpire(cmd.Args, c, timeProvider)
 	case "INCR":
-		return evalIncrement(cmd.Args, c)
+		buf = evalIncrement(cmd.Args)
 	case "BGREWRITEAOF":
-		return evalBackgroundRewriteAof()
+		buf = evalBackgroundRewriteAof()
 	default:
-		return evalPing(cmd.Args, c)
+		buf = evalPing(cmd.Args, c)
 	}
+
+	_, err := c.Write(buf)
+	return err
 }
 
-func validUntil(validFor interface{}, t TimeProvider) int {
+func calculateDuration(validFor interface{}, t TimeProvider) int {
 	ttl, err := strconv.Atoi(validFor.(string))
 	if err != nil {
 		return -1
@@ -272,4 +266,15 @@ func ttlOf(obj *Obj) int {
 	}
 	return obj.ValidTill - int(time.Now().Unix())
 
+}
+
+func deduceTypeEncoding(v string) (uint8, uint8) {
+	if _, err := strconv.ParseInt(v, 10, 64); err == nil {
+		return OBJ_TYPE_STRING, OBJ_ENCODING_INT
+	}
+
+	if len(v) <= 44 {
+		return OBJ_TYPE_STRING, OBJ_ENCODING_EMBSTR
+	}
+	return OBJ_TYPE_STRING, OBJ_ENCODING_RAW
 }
