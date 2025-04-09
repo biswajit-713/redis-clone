@@ -465,9 +465,41 @@ func TestINCRCommand(t *testing.T) {
 			t.Errorf("got: %v, want: %v", string(got), string(want))
 		}
 	})
+}
 
-	t.Run("throw error when command is not correct", func(t *testing.T) {
+func TestINFOCommand(t *testing.T) {
+	t.Run("fetch db information", func(t *testing.T) {
+		mockReadWriter, timeProvider := setupTest()
+		want := []byte("$42\r\n# Keyspace\ndb0:keys=1,expires=0,avg_ttl=0\n\r\n")
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "FLUSHDB", Args: []string{}}, mockReadWriter, timeProvider)
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "SET", Args: []string{"K1", "V1"}}, mockReadWriter, timeProvider)
+
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "INFO", Args: []string{}}, mockReadWriter, timeProvider)
+		got := mockReadWriter.LastWrite
+
+		if !bytes.Equal(got, want) {
+			t.Errorf("got: %v, want: %v", string(got), string(want))
+		}
+	})
+}
+
+func TestFLUSHDBCommand(t *testing.T) {
+	t.Run("flush all the keys", func(t *testing.T) {
+		mockReadWriter, timeProvider := setupTest()
+
+		want := []byte("$42\r\n# Keyspace\ndb0:keys=0,expires=0,avg_ttl=0\n\r\n")
+
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "SET", Args: []string{"K1", "V1"}}, mockReadWriter, timeProvider)
+
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "FLUSHDB", Args: []string{}}, mockReadWriter, timeProvider)
+
+		core.EvalAndRespond(&core.RedisCmd{Cmd: "INFO", Args: []string{}}, mockReadWriter, timeProvider)
+
+		got := mockReadWriter.LastWrite
+
+		if !bytes.Equal(got, want) {
+			t.Errorf("got: %v, want: %v", string(got), string(want))
+		}
 
 	})
-
 }

@@ -192,6 +192,19 @@ func evalBackgroundRewriteAof() []byte {
 	return Encode("OK", true)
 }
 
+func evalInfo() []byte {
+	count := KeyspaceSize()
+	infoMsg := fmt.Sprintf("# Keyspace\ndb0:keys=%d,expires=0,avg_ttl=0\n", count)
+
+	return Encode(infoMsg, false)
+}
+
+func evalFlushDb() []byte {
+	ClearDB()
+
+	return Encode("OK", false)
+}
+
 func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter, timeProvider TimeProvider) error {
 	var buf []byte
 	switch cmd.Cmd {
@@ -211,6 +224,10 @@ func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter, timeProvider TimeProvider) e
 		buf = evalIncrement(cmd.Args)
 	case "BGREWRITEAOF":
 		buf = evalBackgroundRewriteAof()
+	case "INFO":
+		buf = evalInfo()
+	case "FLUSHDB":
+		buf = evalFlushDb()
 	default:
 		buf = evalPing(cmd.Args)
 	}
