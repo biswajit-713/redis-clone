@@ -28,6 +28,7 @@ func (e *EvictRandom) evict(store map[string]*Obj) {
 			break
 		}
 	}
+	computeKeyspaceSize()
 }
 
 func getEvictionStrategy() EvictionStrategy {
@@ -44,11 +45,6 @@ func getEvictionStrategy() EvictionStrategy {
 }
 
 func Evict() {
-	if len(store) >= config.KeysLimit {
-		strategy := getEvictionStrategy()
-		strategy.evict(store)
-	}
-
 	// when the key size reaches KeysLimit, evict 40% of the keys
 	// it is inefficient to calculate the store everytime Evict() is called
 	// hence the store size must be pre-computed

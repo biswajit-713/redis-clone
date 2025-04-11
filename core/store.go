@@ -24,7 +24,6 @@ func Put(key string, value *Obj) {
 	if !exists(key) {
 		keysCount++
 	}
-
 	store[strings.ToUpper(key)] = value
 
 }
@@ -92,4 +91,8 @@ func EvictionSize() int {
 
 func KeyspaceSize() int {
 	return keysCount
+}
+
+func computeKeyspaceSize() {
+	keysCount = len(store)
 }
