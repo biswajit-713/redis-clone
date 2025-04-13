@@ -10,6 +10,10 @@
 ## conigure git to use hooksPath for hooks
 `$git config core.hooksPath .githooks`
 
+## connect a locally running redis-exporter
+`docker run -d -p 9121:9121 --name redis-exporter oliver006/redis_exporter --redis.addr=redis://host.docker.internal:7379`
+`curl http://localhost:9121/metrics`
+
 <!-- 
 implement expiry to expire 40% of keys when limit is hit
 implement INFO command

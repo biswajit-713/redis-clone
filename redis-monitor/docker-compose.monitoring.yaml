@@ -1,0 +1,71 @@
+version: '3.9'
+networks:
+  monitoring:
+    driver: bridge
+volumes:
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+services:
+  prometheus:
+    image: prom/prometheus:v2.37.9
+    container_name: prometheus
+    ports:
+      - '9090:9090'
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yaml'
+    volumes:
+      - ./config/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - ./data:/prometheus
+    restart: unless-stopped
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: grafana
+    ports:
+      - '3000:3000'
+    volumes:
+      - grafana-data:/var/lib/grafana
+    restart: unless-stopped
+    #  redis:
+    #    image: bitnami/redis:latest
+    #    container_name: redis
+    #    ports:
+    #    - '6379:6379'
+    #    environment:
+    #    - REDIS_REPLICATION_MODE=master
+    #    - REDIS_PASSWORD=my_master_password
+  redis-exporter:
+    image: oliver006/redis_exporter
+    container_name: redis-exporter
+    ports:
+    - '9121:9121'
+    environment:
+      REDIS_ADDR: "redis://host.docker.internal:7379"
+      #      REDIS_USER: null
+      #      REDIS_PASSWORD: my_master_password
+    links:
+    - prometheus
+  node-exporter:
+    image: quay.io/prometheus/node-exporter:v1.5.0
+    container_name: node_exporter
+    command: '--path.rootfs=/host'
+    pid: host
+    restart: unless-stopped
+    volumes:
+      - /:/host:ro,rslave
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.0
+    container_name: cadvisor
+    command:
+      - '-port=8098'
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    privileged: true
+    restart: unless-stopped
