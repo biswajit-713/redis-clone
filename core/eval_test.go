@@ -414,8 +414,8 @@ func TestBGREWRITEAOFCommand(t *testing.T) {
 		}, mockReadWriter, timeProvider)
 
 		// Verify the AOF file content
-		content, _ := os.ReadFile(config.AppendOnlyFile)
-		os.Remove(config.AppendOnlyFile)
+		content, _ := os.ReadFile(config.APPEND_ONLY_FILE)
+		os.Remove(config.APPEND_ONLY_FILE)
 		expectedContents := []string{"*3\r\n$3\r\nSET\r\n$4\r\nBGK1\r\n$2\r\nV1\r\n", "*3\r\n$3\r\nSET\r\n$4\r\nBGK2\r\n$2\r\nV2\r\n"}
 		for _, want := range expectedContents {
 			if !bytes.Contains(content, []byte(want)) {

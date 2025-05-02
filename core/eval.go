@@ -139,7 +139,7 @@ func evalIncrement(args []string) []byte {
 
 func evalBackgroundRewriteAof() []byte {
 
-	aofFile := config.AppendOnlyFile
+	aofFile := config.APPEND_ONLY_FILE
 
 	_, err := os.Stat(aofFile)
 	if err != nil {
@@ -161,7 +161,7 @@ func evalBackgroundRewriteAof() []byte {
 	// 	return nil
 	// }
 
-	tempAofFile := fmt.Sprintf("%d-%s", time.Now().Unix(), config.AppendOnlyFile)
+	tempAofFile := fmt.Sprintf("%d-%s", time.Now().Unix(), config.APPEND_ONLY_FILE)
 	file, err := os.Create(tempAofFile)
 	if err != nil {
 		fmt.Println("Error creating file: ", err)

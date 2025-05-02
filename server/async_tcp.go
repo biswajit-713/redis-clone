@@ -27,6 +27,8 @@ func RunAsyncTCPServer(host string, port int) error {
 	connectedClients := 0
 	maxClients := 10000
 
+	core.InitializePool()
+
 	// create a non blocking socket with maximus connections, bind it to ipv4 address and port
 	serverFD, err := createServerSocket(maxClients)
 	if err != nil {

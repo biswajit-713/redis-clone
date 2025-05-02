@@ -7,10 +7,10 @@ r = redis.Redis(host='localhost', port=7379, db=0)
 
 fake = Faker()
 
+counter = 1
 while True:
-    for i in range(0, 58):
-        random_key = f"key:{uuid.uuid4()}"
-        random_value = fake.sentence()
-
+        random_key = "k" + str(counter)
+        random_value = "v" + str(counter)
         r.set(random_key, random_value)
-    time.sleep(20)
+        counter = counter + 1
+        time.sleep(0.1)
