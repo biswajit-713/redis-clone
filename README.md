@@ -16,4 +16,7 @@
 
 <!-- 
 - refactor the code to separate circular dependency between eval and store
+- wrap handling of eStatus in signal_handling and expose functions
+- implement `sleep` command
+- write tests
  -->

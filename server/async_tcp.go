@@ -3,6 +3,8 @@ package server
 import (
 	"log"
 	"net"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -14,7 +16,9 @@ import (
 var cronFrequency time.Duration = 1 * time.Second
 var lastCronExectime time.Time = time.Now()
 
-func RunAsyncTCPServer(host string, port int) error {
+func RunAsyncTCPServer(wg *sync.WaitGroup) error {
+	defer wg.Done()
+
 	log.Println("starting asynchronous TCP server on ", config.Host, config.Port)
 
 	// we are dealing with low level socket connection
@@ -59,7 +63,7 @@ func RunAsyncTCPServer(host string, port int) error {
 
 	var events []syscall.Kevent_t = make([]syscall.Kevent_t, maxClients)
 
-	for {
+	for atomic.LoadInt32(&eStatus) != EngineStatus_SHUTTING_DOWN {
 
 		// every one min, run a check on the keys to delete the expired keys
 		// take 20 keys at one time
@@ -74,6 +78,13 @@ func RunAsyncTCPServer(host string, port int) error {
 		nEvents, err := syscall.Kevent(epollFD, nil, events[:], nil)
 		if err != nil {
 			continue
+		}
+
+		// mark engine to busy only when it is in waiting state
+		if !atomic.CompareAndSwapInt32(&eStatus, EngineStatus_WAITING, EngineStatus_BUSY) {
+			if eStatus == EngineStatus_SHUTTING_DOWN {
+				return nil
+			}
 		}
 
 		// there are two possibilities - either a new connection or data on an existing connection
@@ -111,8 +122,9 @@ func RunAsyncTCPServer(host string, port int) error {
 				respond(comm, cmd)
 			}
 		}
+		atomic.StoreInt32(&eStatus, EngineStatus_WAITING)
 	}
-
+	return nil
 }
 
 func createServerSocket(connections int) (int, error) {
